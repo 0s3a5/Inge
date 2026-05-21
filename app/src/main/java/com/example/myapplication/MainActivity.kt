@@ -33,8 +33,9 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Próximamente: Mis Voluntariados", Toast.LENGTH_SHORT).show()
                     true
                 }
+                // AQUÍ ESTÁ EL CAMBIO
                 R.id.nav_perfil -> {
-                    Toast.makeText(this, "Próximamente: Perfil", Toast.LENGTH_SHORT).show()
+                    cargarFragmento(PerfilFragment())
                     true
                 }
                 else -> false
