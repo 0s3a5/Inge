@@ -1,5 +1,5 @@
 package com.example.myapplication
-
+import java.util.UUID
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -67,59 +67,87 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    // Agrega este import arriba en tu archivo si no lo tienes:
+    // import android.app.Dialog
+    // import android.graphics.Color
+    // import android.graphics.drawable.ColorDrawable
+
+    private fun cargarMarcadoresDePrueba() {
+        // 1. Creamos tu evento ficticio exacto en Ejército 441
+        val eventoEjercito = EventoLocal(
+            titulo = "Punto de Encuentro Universitario",
+            descripcion = "Acopio de materiales de emergencia y reunión de voluntarios. Se necesita agua y linternas.",
+            tipo_evento = "pop-up",
+            direccion = "Av. Ejército Libertador 441, Santiago",
+            latitud = -33.451800,
+            longitud = -70.660600,
+            fecha_evento = "2026-05-25 10:00:00+00"
+        )
+
+        // Lo agregamos al mapa
+        val markerOptions = MarkerOptions().position(LatLng(eventoEjercito.latitud, eventoEjercito.longitud)).title(eventoEjercito.titulo)
+        val marker = mMap.addMarker(markerOptions)
+
+        // Adjuntamos el objeto completo al pin
+        marker?.tag = eventoEjercito
+    }
+
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        // 1. Configurar el diseño personalizado del Pop-up (InfoWindow)
-        mMap.setInfoWindowAdapter(object : GoogleMap.InfoWindowAdapter {
-            // Este método deja el marco del cuadrito por defecto (la flechita abajo)
-            override fun getInfoWindow(marker: Marker): View? = null
-
-            // Aquí metemos nuestro diseño XML dentro del marco
-            override fun getInfoContents(marker: Marker): View {
-                val view = layoutInflater.inflate(R.layout.custom_info_window, null)
-
-                val tvTitulo = view.findViewById<TextView>(R.id.tvTituloTienda)
-                val tvDireccion = view.findViewById<TextView>(R.id.tvDireccionTienda)
-                val tvPrecio = view.findViewById<TextView>(R.id.tvPrecio)
-
-                // Recuperamos la información que le guardamos al pin (el tag)
-                val tiendaInfo = marker.tag as? TiendaLocal
-
-                if (tiendaInfo != null) {
-                    tvTitulo.text = tiendaInfo.nombre
-                    tvDireccion.text = tiendaInfo.direccion
-                    tvPrecio.text = tiendaInfo.precioOferta
-                }
-
-                return view
-            }
-        })
-
-        // 2. Crear nuestra lista de prueba local (Mock Data)
-        val listaTiendas = listOf(
-            TiendaLocal("Centro de Acopio", "Av. Providencia 123", "$1.500", LatLng(-33.440, -70.650)),
-            TiendaLocal("Refugio Providencia", "Calle Nueva 456", "$2.300", LatLng(-33.460, -70.630)),
-            TiendaLocal("Punto Ñuñoa", "Av. Grecia 789", "$990", LatLng(-33.430, -70.620))
-        )
-
-        // 3. Poner los pines en el mapa y guardarles la información
-        for (tienda in listaTiendas) {
-            val markerOptions = MarkerOptions().position(tienda.ubicacion)
-            val marker = mMap.addMarker(markerOptions)
-
-            // ¡MAGIA!: Aquí le adjuntamos toda la info de la tienda al pin
-            marker?.tag = tienda
-        }
-
-        // 4. Iniciar ubicación real (la función que hicimos en el paso anterior)
+        cargarMarcadoresDePrueba()
         verificarPermisosYUbicar()
 
-        // 5. Borramos el Toast antiguo del clic para que Google Maps haga su trabajo
+        // 2. MAGIA DEL MODAL: Qué pasa al tocar el pin
         mMap.setOnMarkerClickListener { marker ->
-            marker.showInfoWindow() // Obligamos a que salga el pop-up
-            false // Retornar falso permite que la cámara se centre en el pin al tocarlo
+            val eventoInfo = marker.tag as? EventoLocal
+
+            if (eventoInfo != null) {
+                mostrarDialogoModal(eventoInfo)
+            }
+
+            // Retornar TRUE es CRÍTICO: significa "Yo me encargo del clic, Google Maps no hagas nada más".
+            // Esto desactiva el cuadrito blanco por defecto.
+            true
         }
+    }
+
+    // 3. Función que crea la ventana que bloquea la app
+    private fun mostrarDialogoModal(evento: EventoLocal) {
+        val dialog = android.app.Dialog(requireContext())
+        dialog.setContentView(R.layout.dialog_evento_modal)
+
+        // ¡ESTA LÍNEA ES LA MÁS IMPORTANTE!
+        // Impide que el usuario cierre el pop-up tocando fuera de él.
+        // Bloquea toda la app hasta que presione el botón de cerrar.
+        dialog.setCancelable(false)
+
+        // Hacemos que el fondo de la ventana sea transparente para que se vean los bordes
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+
+        // Hacemos que el diálogo ocupe casi todo el ancho de la pantalla
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        // Vincular los textos del XML
+        val tvTitulo = dialog.findViewById<TextView>(R.id.tvModalTitulo)
+        val tvTipo = dialog.findViewById<TextView>(R.id.tvModalTipo)
+        val tvDireccion = dialog.findViewById<TextView>(R.id.tvModalDireccion)
+        val tvDescripcion = dialog.findViewById<TextView>(R.id.tvModalDescripcion)
+        val btnCerrar = dialog.findViewById<android.widget.Button>(R.id.btnModalCerrar)
+
+        // Llenar los datos de tu Base de Datos SQL simulada
+        tvTitulo.text = evento.titulo
+        tvTipo.text = "Tipo: ${evento.tipo_evento}"
+        tvDireccion.text = evento.direccion
+        tvDescripcion.text = evento.descripcion
+
+        // Lógica del botón para desbloquear la app
+        btnCerrar.setOnClickListener {
+            dialog.dismiss() // Cierra la ventana
+        }
+
+        // Mostrar la ventana en pantalla
+        dialog.show()
     }
 
     private fun verificarPermisosYUbicar() {
@@ -155,17 +183,20 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    private fun cargarMarcadoresDePrueba() {
-        val tienda1 = LatLng(-33.440, -70.650)
-        val tienda2 = LatLng(-33.460, -70.630)
 
-        mMap.addMarker(MarkerOptions().position(tienda1).title("Centro de Acopio Centro"))
-        mMap.addMarker(MarkerOptions().position(tienda2).title("Refugio Providencia"))
-    }
-}// Este es el molde para nuestra base de datos local falsa
-data class TiendaLocal(
-    val nombre: String,
+}
+
+
+// Estructura idéntica a tu tabla SQL
+data class EventoLocal(
+    val punto_id: String = UUID.randomUUID().toString(), // Genera un UUID automático
+    val titulo: String,
+    val descripcion: String,
+    val tipo_evento: String,
     val direccion: String,
-    val precioOferta: String,
-    val ubicacion: LatLng
+    val latitud: Double,
+    val longitud: Double,
+    val fecha_evento: String,
+    val creado_por: String = UUID.randomUUID().toString(),
+    val fecha_creacion: String = "2026-05-21T21:10:00Z" // Formato TIMESTAMP
 )
