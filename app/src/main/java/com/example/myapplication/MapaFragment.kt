@@ -73,23 +73,51 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
     // import android.graphics.drawable.ColorDrawable
 
     private fun cargarMarcadoresDePrueba() {
-        // 1. Creamos tu evento ficticio exacto en Ejército 441
-        val eventoEjercito = EventoLocal(
-            titulo = "Punto de Encuentro Universitario",
-            descripcion = "Acopio de materiales de emergencia y reunión de voluntarios. Se necesita agua y linternas.",
-            tipo_evento = "pop-up",
-            direccion = "Av. Ejército Libertador 441, Santiago",
-            latitud = -33.451800,
-            longitud = -70.660600,
-            fecha_evento = "2026-05-25 10:00:00+00"
+        // Creamos la lista con tus 3 eventos ficticios que cumplen con tu tabla SQL
+        val listaEventos = listOf(
+            // 1. Punto original de Ejército
+            EventoLocal(
+                titulo = "Punto de Encuentro Universitario",
+                descripcion = "Acopio de materiales de emergencia y reunión de voluntarios. Se necesita agua y linternas.",
+                tipo_evento = "pop-up",
+                direccion = "Av. Ejército Libertador 441, Santiago",
+                latitud = -33.451800,
+                longitud = -70.660600,
+                fecha_evento = "2026-05-25 10:00:00+00"
+            ),
+            // 2. Nuevo punto en Vergara 324
+            EventoLocal(
+                titulo = "Centro Cultural Vergara",
+                descripcion = "Talleres locales y espacio comunitario habilitado para soporte vecinal.",
+                tipo_evento = "pop-up",
+                direccion = "Vergara 324, Santiago",
+                latitud = -33.450700,
+                longitud = -70.660000,
+                fecha_evento = "2026-05-26 14:30:00+00"
+            ),
+            // 3. Nuevo punto en Vergara 275
+            EventoLocal(
+                titulo = "Punto de Información y Redes",
+                descripcion = "Módulo informativo local con mapas impresos y guías de emergencia para el sector.",
+                tipo_evento = "pop-up",
+                direccion = "Vergara 275, Santiago",
+                latitud = -33.449700,
+                longitud = -70.659600,
+                fecha_evento = "2026-05-27 09:00:00+00"
+            )
         )
 
-        // Lo agregamos al mapa
-        val markerOptions = MarkerOptions().position(LatLng(eventoEjercito.latitud, eventoEjercito.longitud)).title(eventoEjercito.titulo)
-        val marker = mMap.addMarker(markerOptions)
+        // El bucle "for" ahora recorrerá los 3 puntos automáticamente
+        for (evento in listaEventos) {
+            val markerOptions = MarkerOptions()
+                .position(LatLng(evento.latitud, evento.longitud))
+                .title(evento.titulo)
 
-        // Adjuntamos el objeto completo al pin
-        marker?.tag = eventoEjercito
+            val marker = mMap.addMarker(markerOptions)
+
+            // CRÍTICO: Vinculamos cada objeto específico a su propio pin físico en el mapa
+            marker?.tag = evento
+        }
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
