@@ -30,11 +30,8 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
-    // 1. SOLO DECLARAMOS la variable aquí arriba (sin inicializarla aún)
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
 
-    // 2. REGISTRAMOS el contrato en el onCreate (El momento exacto y seguro)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -44,7 +41,6 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
             if (isGranted) {
                 obtenerUbicacionReal()
             } else {
-                // EL USUARIO DIJO QUE NO: Mandamos la cámara a Santiago
                 Toast.makeText(requireContext(), "Permiso denegado.", Toast.LENGTH_SHORT).show()
                 moverCamaraASantiago()
             }
@@ -58,19 +54,16 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Inicializar el cliente de GPS
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
-        // Cargar el mapa
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
-        // Configurar los botones
         val btnGPS = view.findViewById<FloatingActionButton>(R.id.btnGPS)
         val btnFiltro = view.findViewById<View>(R.id.btnFiltro)
 
         btnGPS.setOnClickListener {
-            verificarPermisosYUbicar() // Si tocamos el botón, volvemos a buscar el GPS
+            verificarPermisosYUbicar()
         }
 
         btnFiltro.setOnClickListener {
@@ -84,16 +77,12 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         cargarMarcadoresDePrueba()
         verificarPermisosYUbicar()
 
-        // MAGIA DEL MODAL: Qué pasa al tocar el pin
         mMap.setOnMarkerClickListener { marker ->
             val eventoInfo = marker.tag as? EventoLocal
 
             if (eventoInfo != null) {
                 mostrarDialogoModal(eventoInfo)
             }
-
-            // Retornar TRUE es CRÍTICO: significa "Yo me encargo del clic, Google Maps no hagas nada más".
-            // Esto desactiva el cuadrito blanco por defecto.
             true
         }
     }
@@ -118,7 +107,6 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
                 val miUbicacionReal = LatLng(location.latitude, location.longitude)
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(miUbicacionReal, 15f))
             } else {
-                // EL GPS FALLÓ O ESTÁ APAGADO: Mandamos la cámara a Santiago
                 Toast.makeText(requireContext(), "No se pudo encontrar tu ubicación física.", Toast.LENGTH_SHORT).show()
                 moverCamaraASantiago()
             }
@@ -128,50 +116,50 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
     private fun moverCamaraASantiago() {
         if (!::mMap.isInitialized) return
 
-        // Coordenadas del centro de Santiago (Plaza de Armas / La Moneda)
         val santiagoPredeterminado = LatLng(-33.4402, -70.6534)
-
-        // Movemos la cámara con un zoom nivel 12 (suficiente para ver toda la ciudad)
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(santiagoPredeterminado, 12f))
-
         Toast.makeText(requireContext(), "Mostrando ubicación predeterminada (Santiago).", Toast.LENGTH_SHORT).show()
     }
 
     private fun cargarMarcadoresDePrueba() {
-        // Recreamos la base de datos local basándonos EXACTAMENTE en tu imagen
+        // Base de datos simulada con los nuevos campos agregados
         val listaEventos = listOf(
             EventoLocal(
                 titulo = "Bingo",
-                descripcion = "Bingo a benefio de Vicente Muhr",
+                descripcion = "Bingo a beneficio de Vicente Muhr",
                 tipo_evento = "Personal",
                 direccion = "Ejercito 278",
                 latitud = -33.45022843,
                 longitud = -70.66074543,
-                fecha_evento = "2026-05-25 18:00:00+00"
+                fecha_evento = "2026-05-25 18:00",
+                creado_por = "Vicente Muhr",
+                verificado = false // Personal, no está verificado
             ),
             EventoLocal(
                 titulo = "Banco de sangre",
-                descripcion = "ven a donar al Hospital Barros Luco:)",
+                descripcion = "Ven a donar al Hospital Barros Luco :)",
                 tipo_evento = "Estatal",
-                direccion = "ejercito 441",
+                direccion = "Ejercito 441",
                 latitud = -33.45244946,
                 longitud = -70.66051520,
-                fecha_evento = "2026-05-26 09:00:00+00"
+                fecha_evento = "2026-05-26 09:00",
+                creado_por = "MINSAL (Ministerio de Salud)",
+                verificado = true // Gubernamental, por ende Verificado
             ),
             EventoLocal(
                 titulo = "Albergue HC",
-                descripcion = "Albergue ofrecido por el Hogar de Cristo ",
+                descripcion = "Albergue ofrecido por el Hogar de Cristo",
                 tipo_evento = "ONG",
                 direccion = "Vergara 240",
                 latitud = -33.45024776,
                 longitud = -70.66160922,
-                fecha_evento = "2026-05-24 20:00:00+00"
+                fecha_evento = "2026-05-24 20:00",
+                creado_por = "Hogar de Cristo Oficial",
+                verificado = true // Institución registrada, Verificado
             )
         )
 
-        // Colocar los pines en el mapa
         for (evento in listaEventos) {
-            // LÓGICA DE COLORES
             val colorPin = when (evento.tipo_evento.lowercase()) {
                 "estatal" -> BitmapDescriptorFactory.HUE_RED
                 "ong" -> BitmapDescriptorFactory.HUE_BLUE
@@ -179,45 +167,49 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
                 else -> BitmapDescriptorFactory.HUE_ORANGE
             }
 
-            // Creamos el pin asignándole la posición, el título y el COLOR
             val markerOptions = MarkerOptions()
                 .position(LatLng(evento.latitud, evento.longitud))
                 .title(evento.titulo)
                 .icon(BitmapDescriptorFactory.defaultMarker(colorPin))
 
             val marker = mMap.addMarker(markerOptions)
-
-            // Vinculamos la info para que el Pop-up (Modal) funcione al tocarlo
             marker?.tag = evento
         }
     }
 
-    // Función que crea la ventana que bloquea la app
     private fun mostrarDialogoModal(evento: EventoLocal) {
         val dialog = android.app.Dialog(requireContext())
         dialog.setContentView(R.layout.dialog_evento_modal)
-
-        // Bloquea toda la app hasta que presione el botón de cerrar.
         dialog.setCancelable(false)
 
-        // Hacemos que el fondo de la ventana sea transparente para que se vean los bordes
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-        // Vincular los textos del XML
+        // Vincular las vistas del XML actualizadas
         val tvTitulo = dialog.findViewById<TextView>(R.id.tvModalTitulo)
+        val tvVerificado = dialog.findViewById<TextView>(R.id.tvModalVerificado)
+        val tvCreador = dialog.findViewById<TextView>(R.id.tvModalCreador)
         val tvTipo = dialog.findViewById<TextView>(R.id.tvModalTipo)
+        val tvFecha = dialog.findViewById<TextView>(R.id.tvModalFecha)
         val tvDireccion = dialog.findViewById<TextView>(R.id.tvModalDireccion)
         val tvDescripcion = dialog.findViewById<TextView>(R.id.tvModalDescripcion)
         val btnCerrar = dialog.findViewById<android.widget.Button>(R.id.btnModalCerrar)
 
-        // Llenar los datos de tu Base de Datos SQL simulada
+        // Asignar los textos dinámicamente
         tvTitulo.text = evento.titulo
+        tvCreador.text = "Organizado por: ${evento.creado_por}"
         tvTipo.text = "Tipo: ${evento.tipo_evento}"
-        tvDireccion.text = evento.direccion
+        tvFecha.text = "📅 Fecha: ${evento.fecha_evento}"
+        tvDireccion.text = "📍 Dirección: ${evento.direccion}"
         tvDescripcion.text = evento.descripcion
 
-        // Lógica del botón para desbloquear la app
+        // LÓGICA DE VERIFICACIÓN (Muestra u oculta el ticket según el booleano)
+        if (evento.verificado) {
+            tvVerificado.visibility = View.VISIBLE
+        } else {
+            tvVerificado.visibility = View.GONE // Desaparece por completo el espacio del ticket
+        }
+
         btnCerrar.setOnClickListener {
             dialog.dismiss()
         }
@@ -226,7 +218,7 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
     }
 }
 
-// Estructura idéntica a tu tabla SQL
+// Estructura de datos alineada al 100% con tu base de datos
 data class EventoLocal(
     val punto_id: String = UUID.randomUUID().toString(),
     val titulo: String,
@@ -235,7 +227,8 @@ data class EventoLocal(
     val direccion: String,
     val latitud: Double,
     val longitud: Double,
-    val fecha_evento: String,
-    val creado_por: String = UUID.randomUUID().toString(),
+    val fecha_evento: String, // String correspondiente al VARCHAR/DATETIME legible
+    val creado_por: String,   // Creador en formato String (VARCHAR)
+    val verificado: Boolean,  // Verificación en formato Booleano (BOOL)
     val fecha_creacion: String = "2026-05-21T21:10:00Z"
 )

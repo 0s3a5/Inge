@@ -6,14 +6,45 @@
     android:padding="24dp"
     android:background="@android:color/white">
 
-    <TextView
-        android:id="@+id/tvModalTitulo"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Título del Evento"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="@android:color/black"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvModalTitulo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Título del Evento"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/tvModalVerificado"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✓ Verificado"
+            android:textColor="#2E7D32"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginStart="8dp"
+            android:background="#E8F5E9"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvModalCreador"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Organizado por: Juan Pérez"
+        android:textSize="13sp"
+        android:textColor="#555555"
+        android:textStyle="italic"
         android:layout_marginBottom="8dp"/>
 
     <TextView
@@ -26,16 +57,26 @@
         android:paddingHorizontal="8dp"
         android:paddingVertical="4dp"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="12dp"/>
+
+    <TextView
+        android:id="@+id/tvModalFecha"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📅 Fecha: 25-05-2026"
+        android:textSize="14sp"
+        android:textColor="@android:color/black"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
 
     <TextView
         android:id="@+id/tvModalDireccion"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Dirección"
-        android:textSize="16sp"
-        android:drawablePadding="8dp"
-        android:layout_marginBottom="8dp"/>
+        android:text="📍 Dirección: Ejército 441"
+        android:textSize="14sp"
+        android:textColor="#333333"
+        android:layout_marginBottom="12dp"/>
 
     <TextView
         android:id="@+id/tvModalDescripcion"
