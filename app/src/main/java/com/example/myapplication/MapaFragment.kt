@@ -1,6 +1,8 @@
 package com.example.myapplication
+
 import java.util.UUID
 import android.Manifest
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -9,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -26,17 +29,25 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 class MapaFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
-    // Esta variable es la que lee el GPS del teléfono
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    // Este es el "lanzador" que muestra la ventanita preguntando por permisos
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            obtenerUbicacionReal()
-        } else {
-            Toast.makeText(requireContext(), "Permiso denegado. No podemos mostrar tu ubicación.", Toast.LENGTH_LONG).show()
+    // 1. SOLO DECLARAMOS la variable aquí arriba (sin inicializarla aún)
+    private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
+
+    // 2. REGISTRAMOS el contrato en el onCreate (El momento exacto y seguro)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        requestPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                obtenerUbicacionReal()
+            } else {
+                // EL USUARIO DIJO QUE NO: Mandamos la cámara a Santiago
+                Toast.makeText(requireContext(), "Permiso denegado.", Toast.LENGTH_SHORT).show()
+                moverCamaraASantiago()
+            }
         }
     }
 
@@ -67,66 +78,13 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    // Agrega este import arriba en tu archivo si no lo tienes:
-    // import android.app.Dialog
-    // import android.graphics.Color
-    // import android.graphics.drawable.ColorDrawable
-
-    private fun cargarMarcadoresDePrueba() {
-        // Creamos la lista con tus 3 eventos ficticios que cumplen con tu tabla SQL
-        val listaEventos = listOf(
-            // 1. Punto original de Ejército
-            EventoLocal(
-                titulo = "Punto de Encuentro Universitario",
-                descripcion = "Acopio de materiales de emergencia y reunión de voluntarios. Se necesita agua y linternas.",
-                tipo_evento = "pop-up",
-                direccion = "Av. Ejército Libertador 441, Santiago",
-                latitud = -33.451800,
-                longitud = -70.660600,
-                fecha_evento = "2026-05-25 10:00:00+00"
-            ),
-            // 2. Nuevo punto en Vergara 324
-            EventoLocal(
-                titulo = "Centro Cultural Vergara",
-                descripcion = "Talleres locales y espacio comunitario habilitado para soporte vecinal.",
-                tipo_evento = "pop-up",
-                direccion = "Vergara 324, Santiago",
-                latitud = -33.450700,
-                longitud = -70.660000,
-                fecha_evento = "2026-05-26 14:30:00+00"
-            ),
-            // 3. Nuevo punto en Vergara 275
-            EventoLocal(
-                titulo = "Punto de Información y Redes",
-                descripcion = "Módulo informativo local con mapas impresos y guías de emergencia para el sector.",
-                tipo_evento = "pop-up",
-                direccion = "Vergara 275, Santiago",
-                latitud = -33.449700,
-                longitud = -70.659600,
-                fecha_evento = "2026-05-27 09:00:00+00"
-            )
-        )
-
-        // El bucle "for" ahora recorrerá los 3 puntos automáticamente
-        for (evento in listaEventos) {
-            val markerOptions = MarkerOptions()
-                .position(LatLng(evento.latitud, evento.longitud))
-                .title(evento.titulo)
-
-            val marker = mMap.addMarker(markerOptions)
-
-            // CRÍTICO: Vinculamos cada objeto específico a su propio pin físico en el mapa
-            marker?.tag = evento
-        }
-    }
-
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
         cargarMarcadoresDePrueba()
         verificarPermisosYUbicar()
 
-        // 2. MAGIA DEL MODAL: Qué pasa al tocar el pin
+        // MAGIA DEL MODAL: Qué pasa al tocar el pin
         mMap.setOnMarkerClickListener { marker ->
             val eventoInfo = marker.tag as? EventoLocal
 
@@ -140,20 +98,110 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    // 3. Función que crea la ventana que bloquea la app
+    private fun verificarPermisosYUbicar() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            obtenerUbicacionReal()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun obtenerUbicacionReal() {
+        if (!::mMap.isInitialized) return
+
+        mMap.isMyLocationEnabled = true
+        mMap.uiSettings.isMyLocationButtonEnabled = false
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val miUbicacionReal = LatLng(location.latitude, location.longitude)
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(miUbicacionReal, 15f))
+            } else {
+                // EL GPS FALLÓ O ESTÁ APAGADO: Mandamos la cámara a Santiago
+                Toast.makeText(requireContext(), "No se pudo encontrar tu ubicación física.", Toast.LENGTH_SHORT).show()
+                moverCamaraASantiago()
+            }
+        }
+    }
+
+    private fun moverCamaraASantiago() {
+        if (!::mMap.isInitialized) return
+
+        // Coordenadas del centro de Santiago (Plaza de Armas / La Moneda)
+        val santiagoPredeterminado = LatLng(-33.4402, -70.6534)
+
+        // Movemos la cámara con un zoom nivel 12 (suficiente para ver toda la ciudad)
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(santiagoPredeterminado, 12f))
+
+        Toast.makeText(requireContext(), "Mostrando ubicación predeterminada (Santiago).", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun cargarMarcadoresDePrueba() {
+        // Recreamos la base de datos local basándonos EXACTAMENTE en tu imagen
+        val listaEventos = listOf(
+            EventoLocal(
+                titulo = "Bingo",
+                descripcion = "Bingo a benefio de Vicente Muhr",
+                tipo_evento = "Personal",
+                direccion = "Ejercito 278",
+                latitud = -33.45022843,
+                longitud = -70.66074543,
+                fecha_evento = "2026-05-25 18:00:00+00"
+            ),
+            EventoLocal(
+                titulo = "Banco de sangre",
+                descripcion = "ven a donar al Hospital Barros Luco:)",
+                tipo_evento = "Estatal",
+                direccion = "ejercito 441",
+                latitud = -33.45244946,
+                longitud = -70.66051520,
+                fecha_evento = "2026-05-26 09:00:00+00"
+            ),
+            EventoLocal(
+                titulo = "Albergue HC",
+                descripcion = "Albergue ofrecido por el Hogar de Cristo ",
+                tipo_evento = "ONG",
+                direccion = "Vergara 240",
+                latitud = -33.45024776,
+                longitud = -70.66160922,
+                fecha_evento = "2026-05-24 20:00:00+00"
+            )
+        )
+
+        // Colocar los pines en el mapa
+        for (evento in listaEventos) {
+            // LÓGICA DE COLORES
+            val colorPin = when (evento.tipo_evento.lowercase()) {
+                "estatal" -> BitmapDescriptorFactory.HUE_RED
+                "ong" -> BitmapDescriptorFactory.HUE_BLUE
+                "personal" -> BitmapDescriptorFactory.HUE_GREEN
+                else -> BitmapDescriptorFactory.HUE_ORANGE
+            }
+
+            // Creamos el pin asignándole la posición, el título y el COLOR
+            val markerOptions = MarkerOptions()
+                .position(LatLng(evento.latitud, evento.longitud))
+                .title(evento.titulo)
+                .icon(BitmapDescriptorFactory.defaultMarker(colorPin))
+
+            val marker = mMap.addMarker(markerOptions)
+
+            // Vinculamos la info para que el Pop-up (Modal) funcione al tocarlo
+            marker?.tag = evento
+        }
+    }
+
+    // Función que crea la ventana que bloquea la app
     private fun mostrarDialogoModal(evento: EventoLocal) {
         val dialog = android.app.Dialog(requireContext())
         dialog.setContentView(R.layout.dialog_evento_modal)
 
-        // ¡ESTA LÍNEA ES LA MÁS IMPORTANTE!
-        // Impide que el usuario cierre el pop-up tocando fuera de él.
         // Bloquea toda la app hasta que presione el botón de cerrar.
         dialog.setCancelable(false)
 
         // Hacemos que el fondo de la ventana sea transparente para que se vean los bordes
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-
-        // Hacemos que el diálogo ocupe casi todo el ancho de la pantalla
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
         // Vincular los textos del XML
@@ -171,53 +219,16 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
 
         // Lógica del botón para desbloquear la app
         btnCerrar.setOnClickListener {
-            dialog.dismiss() // Cierra la ventana
+            dialog.dismiss()
         }
 
-        // Mostrar la ventana en pantalla
         dialog.show()
     }
-
-    private fun verificarPermisosYUbicar() {
-        // ¿Ya tenemos permiso?
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            obtenerUbicacionReal()
-        } else {
-            // Si no tenemos permiso, lo pedimos
-            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
-
-    @SuppressLint("MissingPermission") // Anotación porque ya verificamos los permisos arriba
-    private fun obtenerUbicacionReal() {
-        if (!::mMap.isInitialized) return
-
-        // Esto activa el famoso "Punto Azul" en el mapa de Google
-        mMap.isMyLocationEnabled = true
-        // Desactivamos el botón de GPS por defecto de Google para usar el nuestro
-        mMap.uiSettings.isMyLocationButtonEnabled = false
-
-        // Leemos la última ubicación conocida del teléfono
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                // ¡Éxito! Tenemos latitud y longitud real
-                val miUbicacionReal = LatLng(location.latitude, location.longitude)
-
-                // Animamos la cámara hacia esa ubicación con un buen zoom
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(miUbicacionReal, 15f))
-            } else {
-                Toast.makeText(requireContext(), "No se pudo obtener la ubicación. Comprueba que tu GPS esté encendido.", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-
 }
-
 
 // Estructura idéntica a tu tabla SQL
 data class EventoLocal(
-    val punto_id: String = UUID.randomUUID().toString(), // Genera un UUID automático
+    val punto_id: String = UUID.randomUUID().toString(),
     val titulo: String,
     val descripcion: String,
     val tipo_evento: String,
@@ -226,5 +237,5 @@ data class EventoLocal(
     val longitud: Double,
     val fecha_evento: String,
     val creado_por: String = UUID.randomUUID().toString(),
-    val fecha_creacion: String = "2026-05-21T21:10:00Z" // Formato TIMESTAMP
+    val fecha_creacion: String = "2026-05-21T21:10:00Z"
 )
