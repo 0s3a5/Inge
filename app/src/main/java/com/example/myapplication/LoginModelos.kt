@@ -7,7 +7,8 @@ data class RegistroRequest(
     @SerializedName("nombre") val nombre: String,
     @SerializedName("email") val email: String,
     @SerializedName("password") val password: String,
-    @SerializedName("rut") val rut: String
+    @SerializedName("rut") val rut: String,
+    @SerializedName("num_documento") val numDocumento: String = "0"
 )
 data class RegistroResponse(val message: String)
 
@@ -28,27 +29,31 @@ data class UpgradeResponse(val message: String)
 
 // ===== CASO 3: CREAR PUNTO DE VOLUNTARIADO =====
 data class EventoRequest(
-    @SerializedName("titulo") val titulo: String,
-    @SerializedName("descripcion") val descripcion: String,
-    @SerializedName("tipo_evento") val tipoEvento: String,
-    @SerializedName("direccion") val direccion: String,
-    @SerializedName("latitud") val latitud: String,
-    @SerializedName("longitud") val longitud: String,
-    @SerializedName("fecha_evento") val fechaEvento: String, // Formato "2026-06-15T15:30:00Z"
-    @SerializedName("creado_por") val creadoPor: String     // Pasamos el UUID guardado
-)
+    val id: String,
+    val titulo: String,
+    val descripcion: String,
 
+    @SerializedName("tipo_evento") val tipoEvento: String, // Traspasa tipoEvento a tipo_evento
+    val direccion: String,
+    val latitud: Double,
+    val longitud: Double,
+
+    @SerializedName("fecha_evento") val fechaEvento: String, // Traspasa fechaEvento a fecha_evento
+    @SerializedName("creado_por") val creadoPor: String     // Traspasa creadoPor a creado_por
+)
 data class EventoResponse(
     @SerializedName("message") val message: String
 )
+
 data class EventoResponseData(
-    @SerializedName("id") val id: String,
+    @SerializedName("evento_id") val evento_id: Int,
     @SerializedName("titulo") val titulo: String,
     @SerializedName("descripcion") val descripcion: String,
-    @SerializedName("tipo_evento") val tipoEvento: String,
+    @SerializedName("tipo_evento") val tipo_evento: String,
     @SerializedName("direccion") val direccion: String,
     @SerializedName("latitud") val latitud: String,
     @SerializedName("longitud") val longitud: String,
-    @SerializedName("fecha_evento") val fechaEvento: String,
-    @SerializedName("creado_por") val creadoPor: String
+    @SerializedName("fecha_evento") val fecha_evento: String,
+    @SerializedName("creado_por") val creado_por: String,
+    @SerializedName("nombre_creador") val nombre_creador: String
 )

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#F8F9FA">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Publicar Nuevo Evento"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#2B5B84"
+            android:layout_marginBottom="24dp"/>
+
+        <EditText
+            android:id="@+id/etEvTitulo"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Título del Voluntariado"
+            android:inputType="textPersonName"
+            android:background="@android:color/white"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+        <EditText
+            android:id="@+id/etEvDescripcion"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:hint="Descripción de la actividad..."
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:background="@android:color/white"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+        <EditText
+            android:id="@+id/etEvTipo"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Tipo (ej: Limpieza, Comedor, Reforestación)"
+            android:inputType="text"
+            android:background="@android:color/white"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+        <EditText
+            android:id="@+id/etEvDireccion"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Dirección (ej: Av. Pajaritos 1230, Maipú)"
+            android:inputType="textPostalAddress"
+            android:background="@android:color/white"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+        <EditText
+            android:id="@+id/etEvFecha"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Fecha (ej: 2026-12-15)"
+            android:inputType="date"
+            android:background="@android:color/white"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2"
+            android:layout_marginBottom="24dp">
+
+            <EditText
+                android:id="@+id/etEvLat"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:hint="Latitud calculada"
+                android:focusable="false"
+                android:clickable="false"
+                android:background="#EFEFEF"
+                android:paddingHorizontal="12dp"
+                android:elevation="2dp"/>
+
+            <EditText
+                android:id="@+id/etEvLng"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:hint="Longitud (ej: -70.75)"
+                android:inputType="numberSigned|numberDecimal"
+                android:background="@android:color/white"
+                android:paddingHorizontal="12dp"
+                android:layout_marginLeft="6dp"
+                android:elevation="2dp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnGuardarEvento"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="PUBLICAR EN EL MAPA"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2B5B84"
+            android:textStyle="bold"/>
+
+    </LinearLayout>
+</ScrollView>

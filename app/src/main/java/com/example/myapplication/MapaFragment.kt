@@ -3,10 +3,16 @@ package com.example.myapplication // ⚠️ REVISA: Asegúrate de que coincida c
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
+import android.view.View // 🚀 CRÍTICO: Resuelve el error de "visibility"
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView // 🚀 CRÍTICO: Resuelve el error de "ImageView"
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -18,10 +24,9 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MapaFragment : Fragment(), OnMapReadyCallback {
 
@@ -31,7 +36,11 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
     private var marcadorUsuario: Marker? = null
     private var rastreoActivo = false
 
-    // Lanzador del diálogo de permisos del sistema de Android
+    // 🗂️ Variables para el motor de filtrado en tiempo real
+    private var listaOriginalEventos: List<EventoResponseData> = emptyList()
+    private var categoriaSeleccionada: String = "Todos"
+    private var textoBusqueda: String = ""
+
     private val pedirPermiso = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { concedido ->
@@ -40,7 +49,6 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
             rastreoActivo = true
         } else {
             Toast.makeText(requireContext(), "Permiso de ubicación denegado", Toast.LENGTH_SHORT).show()
-            Log.w("GPS", "El usuario denegó el permiso de ubicación.")
         }
     }
 
@@ -48,23 +56,19 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Inflamos el diseño con tu barra de búsqueda y botones
         return inflater.inflate(R.layout.fragment_mapa, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Inicializamos el cliente de ubicación de Google
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
-        // Configuración del comportamiento del GPS en tiempo real
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(resultado: LocationResult) {
                 val ubicacion = resultado.lastLocation ?: return
                 val posicion = LatLng(ubicacion.latitude, ubicacion.longitude)
 
-                // Si no existe el pin azul del usuario, lo crea; si existe, lo mueve sutilmente
                 if (marcadorUsuario == null) {
                     marcadorUsuario = mMap.addMarker(
                         MarkerOptions()
@@ -76,78 +80,137 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
                     marcadorUsuario?.position = posicion
                 }
 
-                // Si el rastreo dinámico está activo, la cámara sigue los pasos del usuario
                 if (rastreoActivo) {
                     mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(posicion, 16f))
                 }
-
-                Log.d("GPS", "Ubicación actualizada: ${ubicacion.latitude}, ${ubicacion.longitude}")
             }
         }
 
-        // 1. Inicializamos Google Maps de fondo
         val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
         mapFragment?.getMapAsync(this)
 
-        // 2. Botón de ubicación manual (Centra el mapa rápido en tus coordenadas de desarrollo)
-        val btnUbicacionManual = view.findViewById<FloatingActionButton>(R.id.btnUbicacionManual)
-        btnUbicacionManual?.setOnClickListener {
-            val miZonaPruebas = LatLng(-33.456789, -70.654321) // ⚠️ Cambia por las tuyas si deseas
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(miZonaPruebas, 14f))
-            Log.d("BOTON_CLICK", "Moviendo cámara a zona de pruebas manual.")
+        // 🔍 Buscador de texto
+        val etBuscadorMapa = view.findViewById<EditText>(R.id.etBuscadorMapa)
+        etBuscadorMapa?.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                textoBusqueda = s.toString().trim().lowercase()
+                aplicarFiltrosCombinados()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        // 🏷️ Filtro de Chips
+        val chipGroupCategorias = view.findViewById<ChipGroup>(R.id.chipGroupCategorias)
+        chipGroupCategorias?.setOnCheckedStateChangeListener { _, checkedIds ->
+            categoriaSeleccionada = when (checkedIds.firstOrNull()) {
+                R.id.chipOng -> "ONG"
+                R.id.chipEstatal -> "Estatal"
+                R.id.chipPersonal -> "Personal"
+                else -> "Todos"
+            }
+            aplicarFiltrosCombinados()
         }
 
-        // 3. Botón GPS — Activa y desactiva el rastreo dinámico en el mapa
-        val btnGPS = view.findViewById<FloatingActionButton>(R.id.btnGPS)
-        btnGPS?.setOnClickListener {
+        // Botón Ubicación Manual
+        view.findViewById<FloatingActionButton>(R.id.btnUbicacionManual)?.setOnClickListener {
+            val miZonaPruebas = LatLng(-33.456789, -70.654321)
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(miZonaPruebas, 14f))
+        }
+
+        // Botón GPS
+        view.findViewById<FloatingActionButton>(R.id.btnGPS)?.setOnClickListener {
             if (rastreoActivo) {
                 detenerRastreo()
                 rastreoActivo = false
-                Log.d("GPS", "Rastreo detenido de forma manual.")
             } else {
                 verificarPermisoEIniciar()
-                Log.d("GPS", "Iniciando peticiones de rastreo...")
             }
         }
 
-        // 4. 🔐 CONTROL DE ACCESO POR ROLES (Tipo de usuario)
-        // Buscamos tu botón flotante o de interfaz para añadir voluntariados
-        val btnAgregarVoluntariado = view.findViewById<FloatingActionButton>(R.id.btnAgregarVoluntariado) // ⚠️ Asegúrate de que el ID coincida con tu XML
-
+        // 🔐 Control de acceso por Roles
+        val btnAbrirCrearEvento = view.findViewById<FloatingActionButton>(R.id.btnAgregarVoluntariado)
         val rolUsuario = MyApp.prefs.tipoUsuario
 
         if (rolUsuario == 1) {
-            // Rol 1: Usuario común. Ocultamos por completo el acceso al formulario
-            btnAgregarVoluntariado?.visibility = View.GONE
-            Log.d("ROLES", "Acceso denegado (Rol 1): El usuario no puede agregar voluntariados.")
+            btnAbrirCrearEvento?.visibility = View.GONE
         } else {
-            // Rol 2 (Organizador) o Rol 3 (Administrador): Tienen permitido el acceso
-            btnAgregarVoluntariado?.visibility = View.VISIBLE
-            Log.d("ROLES", "Acceso concedido (Rol $rolUsuario): El usuario puede agregar voluntariados.")
-
-            // Programamos la acción para abrir tu formulario si tiene permisos
-            btnAgregarVoluntariado?.setOnClickListener {
-                // Aquí colocas tu código de navegación habitual, por ejemplo:
-                // parentFragmentManager.beginTransaction().replace(R.id.contenedor, CrearVoluntariadoFragment()).addToBackStack(null).commit()
+            btnAbrirCrearEvento?.visibility = View.VISIBLE
+            btnAbrirCrearEvento?.setOnClickListener {
+                if (MyApp.prefs.userId == null) {
+                    Toast.makeText(requireContext(), "Debes iniciar sesión para crear eventos.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (MyApp.prefs.tipoUsuario == 2) {
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainer, CrearEventoFragment())
+                        .addToBackStack(null)
+                        .commit()
+                } else {
+                    Toast.makeText(requireContext(), "Acceso Denegado: Solo Organizadores.", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
 
-    /**
-     * Se ejecuta de forma segura una vez cargado el mapa de Google
-     */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        // Centrado de cámara por defecto inicial
         val posicionInicial = LatLng(-33.456789, -70.654321)
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(posicionInicial, 11f))
 
-        // Añadimos las utilidades nativas de zoom
         mMap.uiSettings.isZoomControlsEnabled = true
         mMap.uiSettings.isCompassEnabled = true
 
-        // Traemos de inmediato los pines de eventos guardados en la Base de Datos
+        // 🪄 CONFIGURACIÓN DEL CUADRO FLOTANTE NATIVO CON TU DISEÑO FIJADO
+        mMap.setInfoWindowAdapter(object : GoogleMap.InfoWindowAdapter {
+            override fun getInfoWindow(marker: Marker): View? {
+                return null // Usa el recuadro blanco estándar de Google Maps
+            }
+
+            override fun getInfoContents(marker: Marker): View? {
+                if (marker == marcadorUsuario || marker.title == "Tú estás aquí") return null
+
+                val evento = marker.tag as? EventoResponseData ?: return null
+
+                // Inflamos tu diseño modificado con el ancho fijo
+                val vistaCuadro = layoutInflater.inflate(R.layout.modal_mapa_voluntariado, null)
+
+                val tvTitulo = vistaCuadro.findViewById<TextView>(R.id.tvModalTitulo)
+                val ivVerificado = vistaCuadro.findViewById<ImageView>(R.id.ivModalVerificado) // ✅ Sin error
+                val tvCreador = vistaCuadro.findViewById<TextView>(R.id.tvModalCreador)
+                val tvTipo = vistaCuadro.findViewById<TextView>(R.id.tvModalTipo)
+                val tvFecha = vistaCuadro.findViewById<TextView>(R.id.tvModalFecha)
+                val tvDireccion = vistaCuadro.findViewById<TextView>(R.id.tvModalDireccion)
+                val tvDescripcion = vistaCuadro.findViewById<TextView>(R.id.tvModalDescripcion)
+                val btnCerrar = vistaCuadro.findViewById<Button>(R.id.btnModalCerrar)
+
+                // Inyectamos los datos de la BD en tus elementos
+                tvTitulo?.text = evento.titulo
+                tvCreador?.text = "Organizado por: ${evento.nombre_creador}"
+                tvTipo?.text = "Tipo: ${evento.tipo_evento.uppercase()}"
+                tvDireccion?.text = "📍 Dirección: ${evento.direccion}"
+                tvDescripcion?.text = evento.descripcion ?: "Sin descripción detallada."
+
+                // Limpieza de formato de fecha ISO
+                val fechaOriginal = evento.fecha_evento
+                val fechaLimpia = if (fechaOriginal.contains("T")) {
+                    fechaOriginal.split("T")[0]
+                } else {
+                    fechaOriginal
+                }
+                tvFecha?.text = "📅 Fecha: $fechaLimpia"
+
+                // 🎫 Se activa la visibilidad del icono del ticket de forma segura
+                ivVerificado?.visibility = View.VISIBLE // ✅ Sin error gracias al import View
+
+                // Adaptamos el botón estéticamente
+                btnCerrar?.text = "TOCA EL MAPA PARA CERRAR"
+
+                return vistaCuadro
+            }
+        })
+
         cargarPinesDesdeElBackend()
     }
 
@@ -165,37 +228,22 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    // Comienza a pedirle coordenadas al GPS cada 3 segundos
     private fun iniciarRastreo() {
-        val solicitud = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            3000L
-        ).setMinUpdateIntervalMillis(1500L).build()
-
+        val solicitud = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000L)
+            .setMinUpdateIntervalMillis(1500L).build()
         try {
-            mMap.isMyLocationEnabled = true // Muestra también el punto azul nativo de Google
-            fusedLocationClient.requestLocationUpdates(
-                solicitud,
-                locationCallback,
-                requireActivity().mainLooper
-            )
-        } catch (e: SecurityException) {
-            Log.e("GPS", "Error de seguridad por falta de permisos: ${e.message}")
-        }
+            mMap.isMyLocationEnabled = true
+            fusedLocationClient.requestLocationUpdates(solicitud, locationCallback, requireActivity().mainLooper)
+        } catch (e: SecurityException) { e.printStackTrace() }
     }
 
-    // Apaga el rastreador de GPS para cuidar el consumo de batería
     private fun detenerRastreo() {
-        try {
-            mMap.isMyLocationEnabled = false
-        } catch (e: SecurityException) { e.printStackTrace() }
-
+        try { mMap.isMyLocationEnabled = false } catch (e: SecurityException) { e.printStackTrace() }
         fusedLocationClient.removeLocationUpdates(locationCallback)
         marcadorUsuario?.remove()
         marcadorUsuario = null
     }
 
-    // Salvaguarda: si cambias de pantalla, el GPS se desconecta automáticamente
     override fun onPause() {
         super.onPause()
         if (rastreoActivo) {
@@ -204,40 +252,72 @@ class MapaFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    /**
-     * Descarga la lista de eventos mediante Retrofit en segundo plano
-     * y los renderiza de forma segura en el Hilo Principal.
-     */
     private fun cargarPinesDesdeElBackend() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                // Realizamos el consumo de la API REST
-                val listaEventos = RetrofitClient.api.obtenerEventos()
-                Log.d("MAPA_RETROFIT", "Eventos descargados con éxito: ${listaEventos.size}")
+                listaOriginalEventos = RetrofitClient.api.obtenerEventos()
+                Log.d("MAPA_RETROFIT", "📡 ¡Conexión exitosa! Llegaron ${listaOriginalEventos.size} eventos.")
 
-                // Forzamos la inyección visual en el Main Thread para evitar bloqueos
-                withContext(Dispatchers.Main) {
-                    for (evento in listaEventos) {
-                        val lat = evento.latitud.toDoubleOrNull()
-                        val lng = evento.longitud.toDoubleOrNull()
+                if (listaOriginalEventos.isEmpty()) {
+                    Toast.makeText(requireContext(), "Base de datos vacía.", Toast.LENGTH_LONG).show()
+                } else {
+                    actualizarMarcadoresEnMapa(listaOriginalEventos)
+                }
+            } catch (e: Exception) {
+                Log.e("MAPA_RETROFIT_ERROR", "❌ Error crítico: ${e.message}")
+                Toast.makeText(requireContext(), "Fallo de conexión", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
-                        if (lat != null && lng != null) {
-                            mMap.addMarker(
-                                MarkerOptions()
-                                    .position(LatLng(lat, lng))
-                                    .title(evento.titulo)
-                                    .snippet(evento.descripcion)
-                            )
-                        } else {
-                            Log.w("MAPA_RETROFIT", "Coordenadas inválidas omitidas para el punto: ${evento.titulo}")
-                        }
-                    }
-                    Log.d("MAPA_RETROFIT", "¡Éxito total! Todos los marcadores válidos se han renderizado.")
+    private fun aplicarFiltrosCombinados() {
+        if (!::mMap.isInitialized) return
+        val listaFiltrada = listaOriginalEventos.filter { evento ->
+            val coincideCategoria = if (categoriaSeleccionada == "Todos") true
+            else evento.tipo_evento.equals(categoriaSeleccionada, ignoreCase = true)
+
+            val coincideTexto = if (textoBusqueda.isEmpty()) true
+            else evento.titulo.lowercase().contains(textoBusqueda) || evento.direccion.lowercase().contains(textoBusqueda)
+
+            coincideCategoria && coincideTexto
+        }
+        actualizarMarcadoresEnMapa(listaFiltrada)
+    }
+
+    private fun actualizarMarcadoresEnMapa(eventos: List<EventoResponseData>) {
+        val posicionUsuarioAnterior = marcadorUsuario?.position
+        mMap.clear()
+
+        // Mantiene tu marcador azul de "Tú estás aquí" si el GPS está activo
+        if (posicionUsuarioAnterior != null) {
+            marcadorUsuario = mMap.addMarker(
+                MarkerOptions().position(posicionUsuarioAnterior).title("Tú estás aquí")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+            )
+        }
+
+        // Dibujar los pines de la Base de Datos con sus colores correspondientes
+        for (evento in eventos) {
+            val lat = evento.latitud.toDoubleOrNull()
+            val lng = evento.longitud.toDoubleOrNull()
+
+            if (lat != null && lng != null) {
+
+                // 🎨 ASIGNACIÓN DE COLORES SEGÚN EL TIPO
+                val colorPin = when (evento.tipo_evento.lowercase().trim()) {
+                    "ong" -> BitmapDescriptorFactory.HUE_BLUE       // 🔵 ONG = Azul
+                    "personal" -> BitmapDescriptorFactory.HUE_GREEN  // 🟢 Personal = Verde
+                    "estatal" -> BitmapDescriptorFactory.HUE_RED     // 🔴 Estatal = Rojo
+                    else -> BitmapDescriptorFactory.HUE_ORANGE       // 🟠 Por si acaso hay otro tipo
                 }
 
-            } catch (e: Exception) {
-                Log.e("MAPA_RETROFIT_ERROR", "Error crítico en el mapeo de pines: ${e.message}")
-                e.printStackTrace()
+                val marker = mMap.addMarker(
+                    MarkerOptions()
+                        .position(LatLng(lat, lng))
+                        .title(evento.titulo)
+                        .icon(BitmapDescriptorFactory.defaultMarker(colorPin)) // 🚀 Aplica el color aquí
+                )
+                marker?.tag = evento // Amarra el objeto al pin para el cuadro de info
             }
         }
     }

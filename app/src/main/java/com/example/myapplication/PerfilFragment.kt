@@ -149,23 +149,32 @@ class PerfilFragment : Fragment() {
             val password = etRegPassword?.text.toString().trim()
             val rut = etRegRut?.text.toString().trim()
 
+            // 1. Primero revisamos que nadie deje campos en blanco
             if (nombre.isEmpty() || email.isEmpty() || password.isEmpty() || rut.isEmpty()) {
                 Toast.makeText(requireContext(), "Por favor, rellene todos los campos", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
+            // 🚀 2. VALIDACIÓN DEL RUT CHILENO (Si es falso, frena el registro aquí)
+            if (!validarRutChileno(rut)) {
+                etRegRut?.error = "El RUT ingresado es inválido o está mal calculado"
+                Toast.makeText(requireContext(), "Por favor, ingresa un RUT chileno real", Toast.LENGTH_LONG).show()
+                return@setOnClickListener // 🛑 Detiene el flujo para que NO se ejecute la corrutina de Retrofit
+            }
+
+            // 📡 3. Si el RUT pasó la prueba matemática, procedemos a registrar de forma segura
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    val objetoRequest = RegistroRequest(nombre, email, password, rut)
+                    val objetoRequest = RegistroRequest(nombre, email, password, rut, numDocumento = "0")
                     val respuesta = RetrofitClient.api.registrarUsuario(objetoRequest)
 
                     Toast.makeText(requireContext(), respuesta.message, Toast.LENGTH_LONG).show()
 
                     // Limpieza de campos y regreso al Login
-                    etRegNombre.text.clear()
-                    etRegEmail.text.clear()
-                    etRegPassword.text.clear()
-                    etRegRut.text.clear()
+                    etRegNombre?.text?.clear()
+                    etRegEmail?.text?.clear()
+                    etRegPassword?.text?.clear()
+                    etRegRut?.text?.clear()
 
                     vistaRegistro?.visibility = View.GONE
                     vistaLogin?.visibility = View.VISIBLE
@@ -216,6 +225,40 @@ class PerfilFragment : Fragment() {
             etPassword?.text?.clear()
 
             evaluarEstadoInterfaz()
+        }
+    }
+    fun validarRutChileno(rut: String): Boolean {
+        val rutLimpio = rut.replace(".", "").replace("-", "").trim().uppercase()
+        if (rutLimpio.length < 8 || rutLimpio.length > 9) return false
+
+        return try {
+            val cuerpo = rutLimpio.substring(0, rutLimpio.length - 1)
+            val dvIngresado = rutLimpio.last()
+            val cuerpoEntero = cuerpo.toIntOrNull() ?: return false
+
+            var suma = 0
+            var multiplicador = 2
+            var auxCuerpo = cuerpoEntero
+
+            while (auxCuerpo > 0) {
+                val ultimoDigito = auxCuerpo % 10
+                suma += ultimoDigito * multiplicador
+                multiplicador = if (multiplicador == 7) 2 else multiplicador + 1
+                auxCuerpo /= 10
+            }
+
+            val resto = suma % 11
+            val resultadoDiferencia = 11 - resto
+
+            val dvEsperado = when (resultadoDiferencia) {
+                11 -> '0'
+                10 -> 'K'
+                else -> resultadoDiferencia.toString()[0]
+            }
+
+            dvIngresado == dvEsperado
+        } catch (e: Exception) {
+            false
         }
     }
 }
