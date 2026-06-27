@@ -1,5 +1,7 @@
 software
 
+esta vola se la pedi a gemini XD
+
 ![Android](https://img.shields.io/badge/Platform-Android-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Language-Kotlin-blue.svg)
 ![MLKit](https://img.shields.io/badge/Tool-ML%20Kit-orange.svg)
