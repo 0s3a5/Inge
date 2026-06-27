@@ -1,4 +1,4 @@
-# app software 📱
+software
 
 ![Android](https://img.shields.io/badge/Platform-Android-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Language-Kotlin-blue.svg)
